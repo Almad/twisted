@@ -7,36 +7,40 @@ warnings.warn(
     "twisted.python.dispatch will soon be no more.",
     DeprecationWarning, 2)
 
+class EventDispatcher(object):
+    __slots__ = [
+        '_handlers']
 
-class EventDispatcher:
-    """
-    A global event dispatcher for events.
-    I'm used for any events that need to span disparate objects in the client.
+    def __init__(self):
+        self._handlers = {}
 
-    I should only be used when one object needs to signal an object that it's
-    not got a direct reference to (unless you really want to pass it through
-    here, in which case I won't mind).
+    @property
+    def handlers(self):
+        return self._handlers
 
-    I'm mainly useful for complex GUIs.
-    """
+    @handlers.setter
+    def handlers(self, handlers):
+        self._handlers = handlers
 
-    def __init__(self, prefix="event_"):
-        self.prefix = prefix
-        self.callbacks = {}
+    def registerHandler(self, name, method):
+        if name in self.handlers.keys():
+            return
 
-
-    def registerHandler(self, name, meth):
-        self.callbacks.setdefault(name, []).append(meth)
-
+        self.handlers[name] = method
 
     def autoRegister(self, obj):
-        from twisted.python import reflect
-        d = {}
-        reflect.accumulateMethods(obj, d, self.prefix)
-        for k,v in d.items():
-            self.registerHandler(k, v)
+        if not obj:
+            raise TypeError('Cannot auto register handlers because the object is NULL!')
 
+        for name in obj.keys():
+            if name in self.handlers.keys():
+                continue
+
+            self.handlers[name] = obj[name]
 
     def publishEvent(self, name, *args, **kwargs):
-        for cb in self.callbacks[name]:
-            cb(*args, **kwargs)
+        if name not in self.handlers.keys():
+            raise AttributeError('Cannot publish event "%s" because it wasn\'t found!' % (
+                name,))
+
+        self.handlers[name](*args, **kwargs)
